@@ -1,6 +1,7 @@
 from __future__ import division
 
 import collections
+import six
 
 
 def partition(lst, f, save_keys = False):
@@ -31,7 +32,7 @@ def partition(lst, f, save_keys = False):
     if save_keys:
         return d
     else:
-        return d.values()
+        return list(d.values())
 
 def group(n, lst, underfull_action = 'ignore', fill_value = None):
     """group(n, lst, underfull_action = 'ignore', fill_value = None) -> list
@@ -68,8 +69,8 @@ def group(n, lst, underfull_action = 'ignore', fill_value = None):
             fill_value = (fill_value,)
         elif isinstance(lst, list):
             fill_value = [fill_value]
-        elif isinstance(lst, (str, unicode)):
-            if not isinstance(fill_value, (str, unicode)):
+        elif isinstance(lst, (six.binary_type, six.text_type)):
+            if not isinstance(fill_value, (six.binary_type, six.text_type)):
                 raise ValueError("group(): cannot fill a string with a non-string")
         else:
             raise ValueError("group(): 'lst' must be either a tuple, list or string")
@@ -135,7 +136,7 @@ def ordlist(s):
       >>> ordlist("hello")
       [104, 101, 108, 108, 111]
     """
-    return map(ord, s)
+    return list(map(ord, s))
 
 def unordlist(cs):
     """unordlist(cs) -> str

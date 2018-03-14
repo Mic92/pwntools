@@ -12,6 +12,7 @@
 # serve to show the default.
 
 import os
+import six
 import subprocess
 import sys
 
@@ -67,9 +68,9 @@ doctest_global_setup = '''
 import sys, os
 os.environ['PWNLIB_NOTERM'] = '1'
 os.environ['PWNLIB_RANDOMIZE'] = '0'
-import pwnlib
+import pwnlib, logging
 pwnlib.context.context.reset_local()
-pwnlib.context.ContextType.defaults['log_level'] = 'ERROR'
+pwnlib.context.ContextType.defaults['log_level'] = logging.ERROR
 pwnlib.context.ContextType.defaults['randomize'] = False
 pwnlib.util.fiddling.default_style = {}
 pwnlib.term.text.when = 'never'
@@ -311,13 +312,13 @@ texinfo_documents = [
 branch = release
 
 try:
-    git_branch = subprocess.check_output('git describe --tags', shell = True)
+    git_branch = subprocess.check_output('git describe --tags', shell = True, universal_newlines = True)
 except subprocess.CalledProcessError:
     git_branch = '-'
 
 try:
     if '-' in git_branch:
-        branch = subprocess.check_output('git rev-parse HEAD', shell = True).strip()[:10]
+        branch = subprocess.check_output('git rev-parse HEAD', shell = True, universal_newlines = True).strip()[:10]
 except subprocess.CalledProcessError:
     pass
 
@@ -345,11 +346,11 @@ def linkcode_resolve(domain, info):
     else:
         filename = info['module'].replace('.', '/') + '.py'
 
-        if isinstance(val, (types.ModuleType, types.ClassType, types.MethodType, types.FunctionType, types.TracebackType, types.FrameType, types.CodeType)):
+        if isinstance(val, (types.ModuleType, types.MethodType, types.FunctionType, types.TracebackType, types.FrameType, types.CodeType) + six.class_types):
             try:
                 lines, first = inspect.getsourcelines(val)
                 filename += '#L%d-%d' % (first, first + len(lines) - 1)
-            except IOError:
+            except (IOError, TypeError):
                 pass
 
     return "https://github.com/Gallopsled/pwntools/blob/%s/%s" % (branch, filename)

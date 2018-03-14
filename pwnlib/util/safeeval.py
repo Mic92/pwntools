@@ -47,7 +47,7 @@ def test_expr(expr, allowed_codes):
     return the compiled code object. Otherwise raise a ValueError
     """
     import dis
-    allowed_codes = [dis.opmap[c] for c in allowed_codes]
+    allowed_codes = [dis.opmap[c] for c in allowed_codes if c in dis.opmap]
     try:
         c = compile(expr, "", "eval")
     except SyntaxError:
@@ -124,7 +124,7 @@ def values(expr, env):
         10
         >>> class Foo:
         ...    def __add__(self, other):
-        ...        print "Firing the missiles"
+        ...        print("Firing the missiles")
         >>> values("A + 1", {'A': Foo()})
         Firing the missiles
         >>> values("A.x", {'A': Foo()})

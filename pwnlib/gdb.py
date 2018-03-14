@@ -143,7 +143,7 @@ def debug_assembly(asm, gdbscript=None, vma=None):
             # 'Hello world!'
     """
     tmp_elf = make_elf_from_assembly(asm, vma=vma, extract=False)
-    os.chmod(tmp_elf, 0777)
+    os.chmod(tmp_elf, 0o777)
 
     atexit.register(lambda: os.unlink(tmp_elf))
 
@@ -181,7 +181,7 @@ def debug_shellcode(data, gdbscript=None, vma=None):
     if isinstance(data, unicode):
         log.error("Shellcode is cannot be unicode.  Did you mean debug_assembly?")
     tmp_elf = make_elf(data, extract=False, vma=vma)
-    os.chmod(tmp_elf, 0777)
+    os.chmod(tmp_elf, 0o777)
 
     atexit.register(lambda: os.unlink(tmp_elf))
 
@@ -275,7 +275,7 @@ def _gdbserver_port(gdbserver, ssh):
         listener.level = 'error'
 
         # Hook them up
-        remote <> listener
+        remote.connect_both(listener)
 
     # Set up port forwarding for ADB
     elif context.os == 'android':
@@ -801,7 +801,7 @@ def ssh_gdb(ssh, argv, gdbscript = None, arch = None, **kwargs):
     # Find the port for the gdb server
     c.recvuntil('port ')
     line = c.recvline().strip()
-    gdbport = re.match('[0-9]+', line)
+    gdbport = re.match(b'[0-9]+', line)
     if gdbport:
         gdbport = int(gdbport.group(0))
 
@@ -809,7 +809,7 @@ def ssh_gdb(ssh, argv, gdbscript = None, arch = None, **kwargs):
     forwardport = l.lport
 
     attach(('127.0.0.1', forwardport), gdbscript, local_exe, arch, ssh=ssh)
-    l.wait_for_connection() <> ssh.connect_remote('127.0.0.1', gdbport)
+    l.wait_for_connection().connect_both(ssh.connect_remote('127.0.0.1', gdbport))
     return c
 
 def find_module_addresses(binary, ssh=None, ulimit=False):
@@ -923,7 +923,7 @@ def find_module_addresses(binary, ssh=None, ulimit=False):
         try:
             path     = next(p for p in local_libs.keys() if remote_path in p)
         except StopIteration:
-            print "Skipping %r" % remote_path
+            print("Skipping %r" % remote_path)
             continue
 
         # Load it
@@ -997,11 +997,11 @@ def version(program='gdb'):
         True
     """
     program = misc.which(program)
-    expr = r'([0-9]+\.?)+'
+    expr = br'([0-9]+\.?)+'
 
     with tubes.process.process([program, '--version'], level='error') as gdb:
         version = gdb.recvline()
 
     versions = re.search(expr, version).group()
 
-    return tuple(map(int, versions.split('.')))
+    return tuple(map(int, versions.split(b'.')))

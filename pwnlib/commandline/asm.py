@@ -84,7 +84,7 @@ parser.add_argument(
     '--infile',
     help="Specify input file",
     default=sys.stdin,
-    type=file
+    type=argparse.FileType('r')
 )
 
 parser.add_argument(
@@ -122,7 +122,7 @@ def main(args):
 
     if fmt[0] == 'e':
         args.output.write(make_elf(output))
-        try: os.fchmod(args.output.fileno(), 0700)
+        try: os.fchmod(args.output.fileno(), 0o700)
         except OSError: pass
     else:
         args.output.write(formatters[fmt[0]](output))

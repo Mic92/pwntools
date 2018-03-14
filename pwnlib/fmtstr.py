@@ -44,7 +44,7 @@ Examples:
     >>> addr = unpack(p.recv(4))
     >>> payload = fmtstr_payload(offset, {addr: 0x1337babe})
     >>> p.sendline(payload)
-    >>> print hex(unpack(p.recv(4)))
+    >>> print(hex(unpack(p.recv(4))))
     0x1337babe
 
 Example - Payload generation
@@ -93,6 +93,7 @@ from __future__ import division
 
 import logging
 import re
+import six
 
 from pwnlib.log import getLogger
 from pwnlib.memleak import MemLeak
@@ -119,18 +120,18 @@ def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte'):
 
     Examples:
         >>> context.clear(arch = 'amd64')
-        >>> print repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='int'))
+        >>> print(repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='int')))
         '\x00\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00%322419374c%1$n%3972547906c%2$n'
-        >>> print repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='short'))
+        >>> print(repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='short')))
         '\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00%47774c%1$hn%22649c%2$hn%60617c%3$hn%4$hn'
-        >>> print repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='byte'))
+        >>> print(repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='byte')))
         '\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x07\x00\x00\x00\x00\x00\x00\x00%126c%1$hhn%252c%2$hhn%125c%3$hhn%220c%4$hhn%237c%5$hhn%6$hhn%7$hhn%8$hhn'
         >>> context.clear(arch = 'i386')
-        >>> print repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='int'))
+        >>> print(repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='int')))
         '\x00\x00\x00\x00%322419386c%1$n'
-        >>> print repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='short'))
+        >>> print(repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='short')))
         '\x00\x00\x00\x00\x02\x00\x00\x00%47798c%1$hn%22649c%2$hn'
-        >>> print repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='byte'))
+        >>> print(repr(fmtstr_payload(1, {0x0: 0x1337babe}, write_size='byte')))
         '\x00\x00\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00%174c%1$hhn%252c%2$hhn%125c%3$hhn%220c%4$hhn'
 
     """
@@ -154,7 +155,7 @@ def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte'):
     number, step, mask, formatz, decalage = config[context.bits][write_size]
 
     # add wheres
-    payload = ""
+    payload = b""
     for where, what in writes.items():
         for i in range(0, number*step, step):
             payload += pack(where+i)
@@ -170,8 +171,8 @@ def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte'):
                 to_add = (current | (mask+1)) - (numbwritten & mask)
 
             if to_add != 0:
-                payload += "%{}c".format(to_add)
-            payload += "%{}${}n".format(offset + fmtCount, formatz)
+                payload += six.b("%{}c".format(to_add))
+            payload += six.b("%{}${}n".format(offset + fmtCount, formatz))
 
             numbwritten += to_add
             what >>= decalage
@@ -223,10 +224,10 @@ class FmtStr(object):
         self.writes = {}
         self.leaker = MemLeak(self._leaker)
 
-    def leak_stack(self, offset, prefix=""):
-        leak = self.execute_fmt(prefix+"START%{}$pEND".format(offset))
+    def leak_stack(self, offset, prefix=b""):
+        leak = self.execute_fmt(prefix+six.b("START%{}$pEND".format(offset)))
         try:
-            leak = re.findall(r"START(.*)END", leak, re.MULTILINE | re.DOTALL)[0]
+            leak = re.findall(br"START(.*)END", leak, re.MULTILINE | re.DOTALL)[0]
             leak = int(leak, 16)
         except ValueError:
             leak = 0
@@ -293,7 +294,7 @@ class FmtStr(object):
         Examples:
 
             >>> def send_fmt_payload(payload):
-            ...     print repr(payload)
+            ...     print(repr(payload))
             ...
             >>> f = FmtStr(send_fmt_payload, offset=5)
             >>> f.write(0x08040506, 0x1337babe)

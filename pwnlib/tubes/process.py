@@ -12,6 +12,7 @@ import pty
 import resource
 import select
 import signal
+import six
 import stat
 import subprocess
 import time
@@ -112,8 +113,8 @@ class process(tube):
     Examples:
 
         >>> p = process('python2')
-        >>> p.sendline("print 'Hello world'")
-        >>> p.sendline("print 'Wow, such data'");
+        >>> p.sendline(b"print 'Hello world'")
+        >>> p.sendline(b"print 'Wow, such data'");
         >>> '' == p.recv(timeout=0.01)
         True
         >>> p.shutdown('send')
@@ -123,9 +124,9 @@ class process(tube):
         False
         >>> p.recvline()
         'Hello world\n'
-        >>> p.recvuntil(',')
+        >>> p.recvuntil(b',')
         'Wow,'
-        >>> p.recvregex('.*data')
+        >>> p.recvregex(b'.*data')
         ' such data'
         >>> p.recv()
         '\n'
@@ -135,7 +136,7 @@ class process(tube):
         EOFError
 
         >>> p = process('cat')
-        >>> d = open('/dev/urandom').read(4096)
+        >>> d = open('/dev/urandom', 'rb').read(4096)
         >>> p.recv(timeout=0.1)
         ''
         >>> p.write(d)
@@ -148,28 +149,28 @@ class process(tube):
         >>> p.poll()
         0
 
-        >>> p = process('cat /dev/zero | head -c8', shell=True, stderr=open('/dev/null', 'w+'))
+        >>> p = process('cat /dev/zero | head -c8', shell=True, stderr=open('/dev/null', 'w+b'))
         >>> p.recv()
         '\x00\x00\x00\x00\x00\x00\x00\x00'
 
-        >>> p = process(['python','-c','import os; print os.read(2,1024)'],
+        >>> p = process(['python','-c','import os; print(os.read(2,1024))'],
         ...             preexec_fn = lambda: os.dup2(0,2))
-        >>> p.sendline('hello')
+        >>> p.sendline(b'hello')
         >>> p.recvline()
         'hello\n'
 
-        >>> stack_smashing = ['python','-c','open("/dev/tty","wb").write("stack smashing detected")']
+        >>> stack_smashing = ['python','-c','open("/dev/tty","wb").write(b"stack smashing detected")']
         >>> process(stack_smashing).recvall()
         'stack smashing detected'
 
         >>> process(stack_smashing, stdout=PIPE).recvall()
         ''
 
-        >>> getpass = ['python','-c','import getpass; print getpass.getpass("XXX")']
+        >>> getpass = ['python','-c','import getpass; print(getpass.getpass("XXX"))']
         >>> p = process(getpass, stdin=PTY)
         >>> p.recv()
         'XXX'
-        >>> p.sendline('hunter2')
+        >>> p.sendline(b'hunter2')
         >>> p.recvall()
         '\nhunter2\n'
 
@@ -242,7 +243,7 @@ class process(tube):
             executable, argv, env = self._validate(cwd, executable, argv, env)
 
         # Permit invocation as process('sh') and process(['sh'])
-        if isinstance(argv, (str, unicode)):
+        if isinstance(argv, (six.binary_type, six.text_type)):
             argv = [argv]
 
         # Avoid the need to have to deal with the STDOUT magic value.
@@ -333,11 +334,11 @@ class process(tube):
 
         if self.pty is not None:
             if stdin is slave:
-                self.proc.stdin = os.fdopen(os.dup(master), 'r+', 0)
+                self.proc.stdin = os.fdopen(os.dup(master), 'r+b', 0)
             if stdout is slave:
-                self.proc.stdout = os.fdopen(os.dup(master), 'r+', 0)
+                self.proc.stdout = os.fdopen(os.dup(master), 'r+b', 0)
             if stderr is slave:
-                self.proc.stderr = os.fdopen(os.dup(master), 'r+', 0)
+                self.proc.stderr = os.fdopen(os.dup(master), 'r+b', 0)
 
             os.close(master)
             os.close(slave)
@@ -475,12 +476,12 @@ class process(tube):
         Example:
 
             >>> p = process('sh')
-            >>> p.sendline('cd /tmp; echo AAA')
-            >>> _ = p.recvuntil('AAA')
+            >>> p.sendline(b'cd /tmp; echo AAA')
+            >>> _ = p.recvuntil(b'AAA')
             >>> p.cwd == '/tmp'
             True
-            >>> p.sendline('cd /proc; echo BBB;')
-            >>> _ = p.recvuntil('BBB')
+            >>> p.sendline(b'cd /proc; echo BBB;')
+            >>> _ = p.recvuntil(b'BBB')
             >>> p.cwd
             '/proc'
         """
@@ -507,10 +508,10 @@ class process(tube):
         # - Must be a list/tuple of strings
         # - Each string must not contain '\x00'
         #
-        if isinstance(argv, (str, unicode)):
+        if isinstance(argv, (six.binary_type, six.text_type)):
             argv = [argv]
 
-        if not all(isinstance(arg, (str, unicode)) for arg in argv):
+        if not all(isinstance(arg, (six.binary_type, six.text_type)) for arg in argv):
             self.error("argv must be strings: %r" % argv)
 
         # Create a duplicate so we can modify it
@@ -569,9 +570,9 @@ class process(tube):
         env = (os.environ if env is None else env).copy()
 
         for k,v in env.items():
-            if not isinstance(k, (str, unicode)):
+            if not isinstance(k, (six.binary_type, six.text_type)):
                 self.error('Environment keys must be strings: %r' % k)
-            if not isinstance(k, (str, unicode)):
+            if not isinstance(k, (six.binary_type, six.text_type)):
                 self.error('Environment values must be strings: %r=%r' % (k,v))
             if '\x00' in k[:-1]:
                 self.error('Inappropriate nulls in env key: %r' % (k))
@@ -938,8 +939,8 @@ class process(tube):
             In order to make sure there's not a race condition against
             the process getting set up...
 
-            >>> p.sendline('echo hello')
-            >>> p.recvuntil('hello')
+            >>> p.sendline(b'echo hello')
+            >>> p.recvuntil(b'hello')
             'hello'
 
             Now we can leak some data!

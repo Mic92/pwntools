@@ -4,6 +4,7 @@ from __future__ import division
 
 import logging
 import re
+import six
 import string
 import subprocess
 import sys
@@ -31,7 +32,7 @@ class tube(Timeout, Logger):
 
     #: Delimiter to use for :meth:`sendline`, :meth:`recvline`,
     #: and related functions.
-    newline = '\n'
+    newline = b'\n'
 
     def __init__(self, timeout = default, level = None, *a, **kw):
         super(tube, self).__init__(timeout)
@@ -76,7 +77,7 @@ class tube(Timeout, Logger):
                 'Hello, world'
         """
         numb = self.buffer.get_fill_size(numb)
-        return self._recv(numb, timeout) or ''
+        return self._recv(numb, timeout) or b''
 
     def unrecv(self, data):
         """unrecv(data)
@@ -121,7 +122,7 @@ class tube(Timeout, Logger):
             >>> len(t.buffer)
             3
         """
-        data = ''
+        data = b''
 
         with self.local(timeout):
             data = self.recv_raw(self.buffer.get_fill_size())
@@ -150,12 +151,12 @@ class tube(Timeout, Logger):
         buffer is empty.
         """
         numb = self.buffer.get_fill_size(numb)
-        data = ''
+        data = b''
 
         # No buffered data, could not put anything in the buffer
         # before timeout.
         if not self.buffer and not self._fillbuffer(timeout):
-            return ''
+            return b''
 
         return self.buffer.get(numb)
 
@@ -180,7 +181,7 @@ class tube(Timeout, Logger):
             or ``''`` if a timeout occurred while waiting.
         """
 
-        data = ''
+        data = b''
 
         with self.countdown(timeout):
             while not pred(data):
@@ -188,13 +189,13 @@ class tube(Timeout, Logger):
                     res = self.recv(1)
                 except Exception:
                     self.unrecv(data)
-                    return ''
+                    return b''
 
                 if res:
                     data += res
                 else:
                     self.unrecv(data)
-                    return ''
+                    return b''
 
         return data
 
@@ -240,7 +241,7 @@ class tube(Timeout, Logger):
                 pass
 
         if len(self.buffer) < numb:
-            return ''
+            return b''
 
         return self.buffer.get(numb)
 
@@ -266,31 +267,31 @@ class tube(Timeout, Logger):
         Examples:
 
             >>> t = tube()
-            >>> t.recv_raw = lambda n: "Hello World!"
-            >>> t.recvuntil(' ')
+            >>> t.recv_raw = lambda n: b"Hello World!"
+            >>> t.recvuntil(b' ')
             'Hello '
             >>> _=t.clean(0)
             >>> # Matches on 'o' in 'Hello'
-            >>> t.recvuntil(tuple(' Wor'))
+            >>> t.recvuntil(tuple(b' Wor'))
             'Hello'
             >>> _=t.clean(0)
             >>> # Matches expressly full string
-            >>> t.recvuntil(' Wor')
+            >>> t.recvuntil(b' Wor')
             'Hello Wor'
             >>> _=t.clean(0)
             >>> # Matches on full string, drops match
-            >>> t.recvuntil(' Wor', drop=True)
+            >>> t.recvuntil(b' Wor', drop=True)
             'Hello'
 
             >>> # Try with regex special characters
             >>> t = tube()
-            >>> t.recv_raw = lambda n: "Hello|World"
-            >>> t.recvuntil('|', drop=True)
+            >>> t.recv_raw = lambda n: b"Hello|World"
+            >>> t.recvuntil(b'|', drop=True)
             'Hello'
 
         """
         # Convert string into singleton tupple
-        if isinstance(delims, (str, unicode)):
+        if isinstance(delims, (six.binary_type, six.text_type)):
             delims = (delims,)
 
         # Longest delimiter for tracking purposes
@@ -298,19 +299,19 @@ class tube(Timeout, Logger):
 
         # Cumulative data to search
         data = []
-        top = ''
+        top = b''
 
         with self.countdown(timeout):
             while self.countdown_active():
                 try:
                     res = self.recv(timeout=self.timeout)
                 except Exception:
-                    self.unrecv(''.join(data) + top)
+                    self.unrecv(b''.join(data) + top)
                     raise
 
                 if not res:
-                    self.unrecv(''.join(data) + top)
-                    return ''
+                    self.unrecv(b''.join(data) + top)
+                    return b''
 
                 top += res
                 start = len(top)
@@ -325,13 +326,13 @@ class tube(Timeout, Logger):
                         top = top[:start]
                     else:
                         top = top[:end]
-                    return ''.join(data) + top
+                    return b''.join(data) + top
                 if len(top) > longest:
                     i = -longest - 1
                     data.append(top[:i])
                     top = top[i:]
 
-        return ''
+        return b''
 
     def recvlines(self, numlines=2**20, keepends = False, timeout = default):
         r"""recvlines(numlines, keepends = False, timeout = default) -> str list
@@ -370,14 +371,14 @@ class tube(Timeout, Logger):
         """
         lines = []
         with self.countdown(timeout):
-            for _ in xrange(numlines):
+            for _ in range(numlines):
                 try:
                     # We must set 'keepends' to True here so that we can
                     # restore the original, unmodified data to the buffer
                     # in the event of a timeout.
                     res = self.recvline(keepends=True, timeout=timeout)
                 except Exception:
-                    self.unrecv(''.join(lines))
+                    self.unrecv(b''.join(lines))
                     raise
 
                 if res:
@@ -487,20 +488,20 @@ class tube(Timeout, Logger):
         Examples:
 
             >>> t = tube()
-            >>> t.recv_raw = lambda n: "Hello\nWorld\nXylophone\n"
-            >>> t.recvline_contains('r')
+            >>> t.recv_raw = lambda n: b"Hello\nWorld\nXylophone\n"
+            >>> t.recvline_contains(b'r')
             'World'
-            >>> f = lambda n: "cat dog bird\napple pear orange\nbicycle car train\n"
+            >>> f = lambda n: b"cat dog bird\napple pear orange\nbicycle car train\n"
             >>> t = tube()
             >>> t.recv_raw = f
-            >>> t.recvline_contains('pear')
+            >>> t.recvline_contains(b'pear')
             'apple pear orange'
             >>> t = tube()
             >>> t.recv_raw = f
-            >>> t.recvline_contains(('car', 'train'))
+            >>> t.recvline_contains((b'car', b'train'))
             'bicycle car train'
         """
-        if isinstance(items, (str,unicode)):
+        if isinstance(items, (six.binary_type, six.text_type)):
             items = (items,)
 
         def pred(line):
@@ -528,16 +529,16 @@ class tube(Timeout, Logger):
         Examples:
 
             >>> t = tube()
-            >>> t.recv_raw = lambda n: "Hello\nWorld\nXylophone\n"
-            >>> t.recvline_startswith(tuple('WXYZ'))
+            >>> t.recv_raw = lambda n: b"Hello\nWorld\nXylophone\n"
+            >>> t.recvline_startswith(tuple(b'WXYZ'))
             'World'
-            >>> t.recvline_startswith(tuple('WXYZ'), True)
+            >>> t.recvline_startswith(tuple(b'WXYZ'), True)
             'Xylophone\n'
-            >>> t.recvline_startswith('Wo')
+            >>> t.recvline_startswith(b'Wo')
             'World'
         """
         # Convert string into singleton tupple
-        if isinstance(delims, (str, unicode)):
+        if isinstance(delims, (six.binary_type, six.text_type)):
             delims = (delims,)
 
         return self.recvline_pred(lambda line: any(map(line.startswith, delims)),
@@ -567,7 +568,7 @@ class tube(Timeout, Logger):
             'Kaboodle'
         """
         # Convert string into singleton tupple
-        if isinstance(delims, (str, unicode)):
+        if isinstance(delims, (six.binary_type, six.text_type)):
             delims = (delims,)
 
         delims = tuple(delim + self.newline for delim in delims)
@@ -589,7 +590,7 @@ class tube(Timeout, Logger):
         all data is buffered and an empty string (``''``) is returned.
         """
 
-        if isinstance(regex, (str, unicode)):
+        if isinstance(regex, (six.binary_type, six.text_type)):
             regex = re.compile(regex)
 
         if exact:
@@ -612,7 +613,7 @@ class tube(Timeout, Logger):
         all data is buffered and an empty string (``''``) is returned.
         """
 
-        if isinstance(regex, (str, unicode)):
+        if isinstance(regex, (six.binary_type, six.text_type)):
             regex = re.compile(regex)
 
         if exact:
@@ -689,7 +690,7 @@ class tube(Timeout, Logger):
 
         Examples:
 
-            >>> def p(x): print repr(x)
+            >>> def p(x): print(repr(x))
             >>> t = tube()
             >>> t.send_raw = p
             >>> t.send('hello')
@@ -707,20 +708,20 @@ class tube(Timeout, Logger):
                 self.indented(fiddling.hexdump(data), level = logging.DEBUG)
         self.send_raw(data)
 
-    def sendline(self, line=''):
+    def sendline(self, line=b''):
         r"""sendline(data)
 
         Shorthand for ``t.send(data + t.newline)``.
 
         Examples:
 
-            >>> def p(x): print repr(x)
+            >>> def p(x): print(repr(x))
             >>> t = tube()
             >>> t.send_raw = p
-            >>> t.sendline('hello')
+            >>> t.sendline(b'hello')
             'hello\n'
-            >>> t.newline = '\r\n'
-            >>> t.sendline('hello')
+            >>> t.newline = b'\r\n'
+            >>> t.sendline(b'hello')
             'hello\r\n'
         """
 
@@ -887,7 +888,7 @@ class tube(Timeout, Logger):
 
         Examples:
 
-            >>> def recv(n, data=['', 'hooray_data']):
+            >>> def recv(n, data=[b'', b'hooray_data']):
             ...     while data: return data.pop()
             >>> t = tube()
             >>> t.recv_raw      = recv
@@ -912,7 +913,7 @@ class tube(Timeout, Logger):
 
         Examples:
 
-            >>> def p(x): print x
+            >>> def p(x): print(x)
             >>> def recvone(n, data=['data']):
             ...     while data: return data.pop()
             ...     raise EOFError
@@ -968,7 +969,7 @@ class tube(Timeout, Logger):
 
         Examples:
 
-            >>> def p(x): print x
+            >>> def p(x): print(x)
             >>> def recvone(n, data=['data']):
             ...     while data: return data.pop()
             ...     raise EOFError
@@ -1071,7 +1072,7 @@ class tube(Timeout, Logger):
             >>> t.can_recv_raw = lambda *a: False
             >>> t.can_recv()
             False
-            >>> _=t.unrecv('data')
+            >>> _=t.unrecv(b'data')
             >>> t.can_recv()
             True
             >>> _=t.recv()
@@ -1127,10 +1128,10 @@ class tube(Timeout, Logger):
 
         Examples:
 
-            >>> def p(x): print x
+            >>> def p(x): print(x)
             >>> t = tube()
             >>> t.shutdown_raw = p
-            >>> _=map(t.shutdown, ('in', 'read', 'recv', 'out', 'write', 'send'))
+            >>> _=list(map(t.shutdown, ('in', 'read', 'recv', 'out', 'write', 'send')))
             recv
             recv
             recv
@@ -1160,10 +1161,10 @@ class tube(Timeout, Logger):
 
         Doctest:
 
-            >>> def p(x): print x
+            >>> def p(x): print(x)
             >>> t = tube()
             >>> t.connected_raw = p
-            >>> _=map(t.connected, ('any', 'in', 'read', 'recv', 'out', 'write', 'send'))
+            >>> _=list(map(t.connected, ('any', 'in', 'read', 'recv', 'out', 'write', 'send')))
             any
             recv
             recv
@@ -1189,7 +1190,7 @@ class tube(Timeout, Logger):
         Examples:
 
             >>> t = tube()
-            >>> def p(x): print x
+            >>> def p(x): print(x)
             >>> t.close = lambda: p("Closed!")
             >>> with t: pass
             Closed!

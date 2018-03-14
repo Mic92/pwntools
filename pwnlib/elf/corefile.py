@@ -69,8 +69,8 @@ import glob
 import gzip
 import re
 import os
+import six
 import socket
-import StringIO
 import tempfile
 
 import elftools
@@ -640,7 +640,7 @@ class Corefile(ELF):
             starts.append((start, offset))
 
         for i in range(count):
-            filename = t.recvuntil('\x00', drop=True)
+            filename = t.recvuntil(b'\x00', drop=True)
             (start, offset) = starts[i]
 
             for mapping in self.mappings:
@@ -1253,7 +1253,7 @@ class CorefileFinder(object):
         Returns:
             `str`: Raw binary data for the core file, or ``None``.
         """
-        file = StringIO.StringIO(crashfile_data)
+        file = six.moves.StringIO(crashfile_data)
 
         # Find the pid of the crashfile
         for line in file:
@@ -1283,7 +1283,7 @@ class CorefileFinder(object):
 
         # Smush everything together, then extract it
         compressed_data = ''.join(chunks)
-        compressed_file = StringIO.StringIO(compressed_data)
+        compressed_file = six.moves.StringIO(compressed_data)
         gzip_file = gzip.GzipFile(fileobj=compressed_file)
         core_data = gzip_file.read()
 
@@ -1321,7 +1321,7 @@ class CorefileFinder(object):
             process(process): Process whose crash we should find.
 
         """
-        if self.kernel_core_pattern.startswith('|'):
+        if self.kernel_core_pattern.startswith(b'|'):
             log.debug("Checking for corefile (piped)")
             return self.native_corefile_pipe()
 
@@ -1332,7 +1332,7 @@ class CorefileFinder(object):
         """native_corefile_pipe(self) -> str
         """
         # We only support apport
-        if '/apport' not in self.kernel_core_pattern:
+        if b'/apport' not in self.kernel_core_pattern:
             log.warn_once("Unsupported core_pattern: %r" % self.kernel_core_pattern)
             return None
 

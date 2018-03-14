@@ -35,7 +35,7 @@ Disassembly
 
     To disassemble code, simply invoke :func:`disasm` on the bytes to disassemble.
 
-    >>> disasm('\xb8\x0b\x00\x00\x00')
+    >>> disasm(b'\xb8\x0b\x00\x00\x00')
     '   0:   b8 0b 00 00 00          mov    eax,0xb'
 
 """
@@ -47,6 +47,7 @@ import os
 import platform
 import re
 import shutil
+import six
 import string
 import subprocess
 import sys
@@ -91,7 +92,7 @@ def dpkg_search_for_binutils(arch, util):
 
     try:
         filename = 'bin/%s*linux*-%s' % (arch, util)
-        output = subprocess.check_output(['dpkg','-S',filename])
+        output = subprocess.check_output(['dpkg','-S',filename], universal_newlines = True)
         for line in output.strip().splitlines():
             package, path = line.split(':', 1)
             packages.append(package)
@@ -245,7 +246,7 @@ def _assembler():
     if not checked_assembler_version[gas]:
         checked_assembler_version[gas] = True
         result = subprocess.check_output([gas, '--version','/dev/null'],
-                                         stderr=subprocess.STDOUT)
+                                         stderr=subprocess.STDOUT, universal_newlines=True)
         version = re.search(r' (\d\.\d+)', result).group(1)
         if version < '2.19':
             log.warn_once('Your binutils version is too old and may not work!\n'  + \
@@ -365,7 +366,8 @@ def _run(cmd, stdin = None):
             cmd,
             stdin  = subprocess.PIPE,
             stdout = subprocess.PIPE,
-            stderr = subprocess.PIPE
+            stderr = subprocess.PIPE,
+            universal_newlines = True
         )
         stdout, stderr = proc.communicate(stdin)
         exitcode = proc.wait()
@@ -475,7 +477,7 @@ def make_elf_from_assembly(assembly,
         >>> sc += shellcraft.echo('Hello\n')
         >>> sc += 'mov rsp, rbp; pop rbp; ret'
         >>> solib = make_elf_from_assembly(sc, shared=1)
-        >>> subprocess.check_output(['echo', 'World'], env={'LD_PRELOAD': solib})
+        >>> subprocess.check_output(['echo', 'World'], env={'LD_PRELOAD': solib}, universal_newlines = True)
         'Hello\nWorld\n'
 
         The same thing can be done with :func:`.make_elf`, though the sizes
@@ -508,7 +510,7 @@ def make_elf_from_assembly(assembly,
     result = asm(assembly, vma = vma, shared = shared, extract = False, **kwargs)
 
     if not extract:
-        os.chmod(result, 0755)
+        os.chmod(result, 0o755)
     else:
         with open(result, 'rb') as io:
             result = io.read()
@@ -541,10 +543,10 @@ def make_elf(data,
         execve('/bin/sh',...).
 
         >>> context.clear(arch='i386')
-        >>> bin_sh = '6a68682f2f2f73682f62696e89e331c96a0b5899cd80'.decode('hex')
+        >>> bin_sh = unhex('6a68682f2f2f73682f62696e89e331c96a0b5899cd80')
         >>> filename = make_elf(bin_sh, extract=False)
         >>> p = process(filename)
-        >>> p.sendline('echo Hello; exit')
+        >>> p.sendline(b'echo Hello; exit')
         >>> p.recvline()
         'Hello\n'
     """
@@ -563,7 +565,7 @@ def make_elf(data,
     assembler = _assembler()
     linker    = _linker()
     code      = _arch_header()
-    code      += '.string "%s"' % ''.join('\\x%02x' % ord(c) for c in data)
+    code      += '.string "%s"' % ''.join('\\x%02x' % c for c in six.iterbytes(data))
     code      += '\n'
 
     log.debug("Building ELF:\n" + code)
@@ -574,7 +576,7 @@ def make_elf(data,
     step3     = path.join(tmpdir, 'step3-elf')
 
     try:
-        with open(step1, 'wb+') as f:
+        with open(step1, 'w') as f:
             f.write(code)
 
         _run(assembler + ['-o', step2, step1])
@@ -595,11 +597,11 @@ def make_elf(data,
             _run([which_binutils('strip'), '--strip-unneeded', step3])
 
         if not extract:
-            os.chmod(step3, 0755)
+            os.chmod(step3, 0o755)
             retval = step3
 
         else:
-            with open(step3, 'r') as f:
+            with open(step3, 'rb') as f:
                 retval = f.read()
     except Exception:
         log.exception("An error occurred while building an ELF:\n%s" % code)
@@ -688,10 +690,11 @@ def asm(shellcode, vma = 0, extract = True, shared = False):
 
             _run(linker + ldflags)
 
-        elif file(step2,'rb').read(4) == '\x7fELF':
+        elif open(step2,'rb').read(4) == b'\x7fELF':
             # Sanity check for seeing if the output has relocations
             relocs = subprocess.check_output(
-                [which_binutils('readelf'), '-r', step2]
+                [which_binutils('readelf'), '-r', step2],
+                universal_newlines = True
             ).strip()
             if extract and len(relocs.split('\n')) > 1:
                 log.error('Shellcode contains relocations:\n%s' % relocs)
@@ -703,7 +706,7 @@ def asm(shellcode, vma = 0, extract = True, shared = False):
 
         _run(objcopy + [step3, step4])
 
-        with open(step4) as fd:
+        with open(step4, 'rb') as fd:
             result = fd.read()
 
     except Exception:
@@ -737,20 +740,20 @@ def disasm(data, vma = 0, byte = True, offset = True, instructions = True):
 
     Examples:
 
-        >>> print disasm('b85d000000'.decode('hex'), arch = 'i386')
+        >>> print(disasm(unhex('b85d000000'), arch = 'i386'))
            0:   b8 5d 00 00 00          mov    eax,0x5d
-        >>> print disasm('b85d000000'.decode('hex'), arch = 'i386', byte = 0)
+        >>> print(disasm(unhex('b85d000000'), arch = 'i386', byte = 0))
            0:   mov    eax,0x5d
-        >>> print disasm('b85d000000'.decode('hex'), arch = 'i386', byte = 0, offset = 0)
+        >>> print(disasm(unhex('b85d000000'), arch = 'i386', byte = 0, offset = 0))
         mov    eax,0x5d
-        >>> print disasm('b817000000'.decode('hex'), arch = 'amd64')
+        >>> print(disasm(unhex('b817000000'), arch = 'amd64'))
            0:   b8 17 00 00 00          mov    eax,0x17
-        >>> print disasm('48c7c017000000'.decode('hex'), arch = 'amd64')
+        >>> print(disasm(unhex('48c7c017000000'), arch = 'amd64'))
            0:   48 c7 c0 17 00 00 00    mov    rax,0x17
-        >>> print disasm('04001fe552009000'.decode('hex'), arch = 'arm')
+        >>> print(disasm(unhex('04001fe552009000'), arch = 'arm'))
            0:   e51f0004        ldr     r0, [pc, #-4]   ; 0x4
            4:   00900052        addseq  r0, r0, r2, asr r0
-        >>> print disasm('4ff00500'.decode('hex'), arch = 'thumb', bits=32)
+        >>> print(disasm(unhex('4ff00500'), arch = 'thumb', bits=32))
            0:   f04f 0005       mov.w   r0, #5
     """
     result = ''
@@ -780,7 +783,7 @@ def disasm(data, vma = 0, byte = True, offset = True, instructions = True):
 
     try:
 
-        with open(step1, 'w') as fd:
+        with open(step1, 'wb') as fd:
             fd.write(data)
 
         res = _run(objcopy + [step1, step2])
