@@ -1161,7 +1161,10 @@ class ELF(ELFFile):
             # Adjust in-segment offset to in-file offset
             offset += data.header.p_offset
 
-            retval.append(self.mmap[offset:offset+length])
+            try:
+                retval.append(self.mmap[offset:offset+length])
+            except TypeError:
+                raise Exception('begin = %r, end = %r' % (begin, end))
 
         return b''.join(retval)
 
@@ -1723,7 +1726,7 @@ class ELF(ELFFile):
             A ``str`` with the string contents (NUL terminator is omitted),
             or an empty string if no NUL terminator could be found.
         """
-        data = ''
+        data = b''
         while True:
             read_size = 0x1000
             partial_page = address & 0xfff
@@ -1734,7 +1737,7 @@ class ELF(ELFFile):
             c = self.read(address, read_size)
 
             if not c:
-                return ''
+                return b''
 
             data += c
 
