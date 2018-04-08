@@ -1157,10 +1157,7 @@ class ELF(ELFFile):
             # Adjust in-segment offset to in-file offset
             offset += data.header.p_offset
 
-            try:
-                retval.append(self.mmap[offset:offset+length])
-            except TypeError:
-                raise Exception('begin = %r, end = %r' % (begin, end))
+            retval.append(self.mmap[offset:offset+length])
 
         return b''.join(retval)
 
