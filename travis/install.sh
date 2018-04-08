@@ -194,7 +194,7 @@ elif [[ "$USER" == "shippable" ]]; then
 elif [[ "$(uname)" == "Darwin" ]]; then
     setup_osx
 elif [[ "$(uname)" == "Linux" ]]; then
-#     setup_linux
+    setup_linux
     setup_android_emulator
 fi
 
